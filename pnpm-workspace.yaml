@@ -1,0 +1,4 @@
+# vitest 经 esbuild 转译测试文件,它装完要跑一次安装脚本取平台二进制。
+# pnpm 11 默认拦住所有构建脚本,放行清单写在这里。
+allowBuilds:
+  esbuild: true

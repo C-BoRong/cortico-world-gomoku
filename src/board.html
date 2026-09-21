@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gomoku</title>
+<style>
+  :root {
+    --bg: #16181d;
+    --panel: #1e2128;
+    --line: #3a3f4b;
+    --star: #4a5060;
+    --black: #101216;
+    --white: #f2f3f5;
+    --text: #e6e8ec;
+    --dim: #9aa1ad;
+    --accent: #6aa6ff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --line: #c8ccd4;
+      --star: #8b93a1;
+      --black: #1a1c20;
+      --white: #ffffff;
+      --text: #1a1c20;
+      --dim: #666d7a;
+      --accent: #2f6fd0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex; justify-content: center;
+  }
+  main { width: 100%; max-width: 560px; }
+  h1 { font-size: 18px; margin: 0 0 4px; font-weight: 600; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 18px; }
+  .bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 16px;
+  }
+  .turn { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); }
+  .dot.black { background: var(--black); }
+  .dot.white { background: var(--white); }
+  .status { flex: 1; min-width: 120px; font-size: 13px; color: var(--dim); }
+  .status.over { color: var(--accent); font-weight: 600; }
+  button {
+    font: inherit; color: var(--text); background: transparent;
+    border: 1px solid var(--line); border-radius: 7px; padding: 6px 14px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; }
+  .board-wrap { position: relative; width: 100%; aspect-ratio: 1; }
+  canvas { width: 100%; height: 100%; display: block; border-radius: 10px; cursor: pointer; touch-action: manipulation; }
+  canvas.waiting { cursor: default; }
+  .foot { margin-top: 14px; font-size: 12px; color: var(--dim); }
+  .err { color: #e06c75; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Gomoku</h1>
+  <div class="sub">你执 <span id="you">–</span>。轮到你时点棋盘落子。</div>
+
+  <div class="bar">
+    <div class="turn"><span class="dot" id="dot"></span><span id="turnText">等待开局</span></div>
+    <div class="status" id="status">还没有对局。</div>
+    <button id="resign" disabled>认输</button>
+  </div>
+
+  <div class="board-wrap"><canvas id="board"></canvas></div>
+  <div class="foot" id="foot">落子后这一页会自动跟上 AI 的回应。</div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var canvas = document.getElementById('board');
+  var ctx = canvas.getContext('2d');
+  var elYou = document.getElementById('you');
+  var elDot = document.getElementById('dot');
+  var elTurnText = document.getElementById('turnText');
+  var elStatus = document.getElementById('status');
+  var elResign = document.getElementById('resign');
+  var elFoot = document.getElementById('foot');
+
+  var state = null;      // 服务端给的快照
+  var size = 15;
+  var cells = [];        // 'black' | 'white' | null
+  var youAre = null;     // 'black' | 'white' | null
+  var busy = false;
+
+  function fit() {
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function pad() { return Math.max(16, canvas.getBoundingClientRect().width / (size + 1) * 0.62); }
+
+  function geom() {
+    var w = canvas.getBoundingClientRect().width;
+    var p = pad();
+    return { p: p, step: (w - p * 2) / (size - 1), w: w };
+  }
+
+  function draw() {
+    if (!cells.length) return;
+    var g = geom();
+    var styles = getComputedStyle(document.documentElement);
+    var cLine = styles.getPropertyValue('--line').trim();
+    var cStar = styles.getPropertyValue('--star').trim();
+    var cPanel = styles.getPropertyValue('--panel').trim();
+    var cText = styles.getPropertyValue('--dim').trim();
+    var cBlack = styles.getPropertyValue('--black').trim();
+    var cWhite = styles.getPropertyValue('--white').trim();
+
+    ctx.clearRect(0, 0, g.w, g.w);
+    ctx.fillStyle = cPanel;
+    ctx.fillRect(0, 0, g.w, g.w);
+
+    ctx.strokeStyle = cLine;
+    ctx.lineWidth = 1;
+    for (var i = 0; i < size; i++) {
+      var at = g.p + i * g.step;
+      ctx.beginPath(); ctx.moveTo(g.p, at); ctx.lineTo(g.w - g.p, at); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(at, g.p); ctx.lineTo(at, g.w - g.p); ctx.stroke();
+    }
+
+    // 星位:标准 15 路是 4 与 8 的交叉点
+    var stars = size === 15 ? [3, 7, 11] : (size === 19 ? [3, 9, 15] : []);
+    ctx.fillStyle = cStar;
+    for (var a = 0; a < stars.length; a++) {
+      for (var b = 0; b < stars.length; b++) {
+        if (size === 15 && (a === 1) !== (b === 1)) continue;
+        ctx.beginPath();
+        ctx.arc(g.p + stars[a] * g.step, g.p + stars[b] * g.step, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // 坐标轴:列字母在下、行号在左
+    ctx.fillStyle = cText;
+    ctx.font = Math.max(9, g.step * 0.34) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (var c = 0; c < size; c++) {
+      ctx.fillText(String.fromCharCode(65 + c), g.p + c * g.step, g.w - g.p / 2 + 2);
+    }
+    ctx.textAlign = 'right';
+    for (var r = 0; r < size; r++) {
+      ctx.fillText(String(r + 1), g.p / 2, g.p + r * g.step);
+    }
+
+    var radius = g.step * 0.42;
+    for (var row = 0; row < size; row++) {
+      for (var col = 0; col < size; col++) {
+        var v = cells[row * size + col];
+        if (!v) continue;
+        var cx = g.p + col * g.step, cy = g.p + row * g.step;
+        ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fillStyle = v === 'black' ? cBlack : cWhite;
+        ctx.fill();
+        ctx.strokeStyle = cLine; ctx.lineWidth = 1; ctx.stroke();
+      }
+    }
+
+    var last = state && state.lastMove;
+    if (last) {
+      ctx.beginPath();
+      ctx.arc(g.p + last.col * g.step, g.p + last.row * g.step, radius * 0.28, 0, Math.PI * 2);
+      ctx.fillStyle = cells[last.row * size + last.col] === 'black' ? cWhite : cBlack;
+      ctx.fill();
+    }
+  }
+
+  function render() {
+    if (!state) return;
+    size = state.size;
+    cells = state.cells;
+    youAre = state.youAre;
+
+    elYou.textContent = youAre === 'black' ? '黑棋' : youAre === 'white' ? '白棋' : '–';
+    elDot.className = 'dot' + (state.turn ? ' ' + state.turn : '');
+
+    if (state.phase === 'playing') {
+      var yourTurn = state.turn === youAre;
+      elTurnText.textContent = yourTurn ? '轮到你' : '轮到 AI(' + (state.turn === 'black' ? '黑' : '白') + ')';
+      elStatus.textContent = '第 ' + (state.moves + 1) + ' 手';
+      elStatus.className = 'status';
+      canvas.classList.toggle('waiting', !yourTurn);
+      elResign.disabled = busy;
+    } else {
+      var text = state.phase === 'black-won' ? '黑棋胜'
+        : state.phase === 'white-won' ? '白棋胜'
+        : state.phase === 'draw' ? '平局' : '已结束';
+      var who = state.winner === youAre ? '你赢了' : (state.winner ? 'AI 赢了' : text);
+      elTurnText.textContent = text;
+      elStatus.textContent = who + '。开新的一局请让 AI 调用 gomoku_start。';
+      elStatus.className = 'status over';
+      canvas.classList.add('waiting');
+      elResign.disabled = true;
+    }
+    draw();
+  }
+
+  function apply(snap) {
+    state = snap;
+    render();
+  }
+
+  function fetchState() {
+    return fetch('state', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('state ' + r.status); return r.json(); })
+      .then(apply)
+      .catch(function () { elFoot.innerHTML = '<span class="err">连不上棋局服务。</span>'; });
+  }
+
+  // 轮询:局面很小,人机对局的节奏是秒级,轮询够用且不用维护连接。
+  var timer = null;
+  function startPolling() {
+    if (timer) return;
+    timer = setInterval(function () {
+      if (document.visibilityState === 'visible' && !busy) fetchState();
+    }, 900);
+  }
+
+  canvas.addEventListener('click', function (ev) {
+    if (!state || busy) return;
+    if (state.phase !== 'playing' || state.turn !== youAre) return;
+    var rect = canvas.getBoundingClientRect();
+    var g = geom();
+    var col = Math.round((ev.clientX - rect.left - g.p) / g.step);
+    var row = Math.round((ev.clientY - rect.top - g.p) / g.step);
+    if (col < 0 || row < 0 || col >= size || row >= size) return;
+    if (cells[row * size + col]) return;
+
+    busy = true;
+    elResign.disabled = true;
+    fetch('place', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ col: col, row: row })
+    })
+      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
+      .then(function (res) {
+        if (!res.ok) { elFoot.innerHTML = '<span class="err">' + (res.body.error || '落子被拒') + '</span>'; return; }
+        apply(res.body);
+      })
+      .catch(function () { elFoot.innerHTML = '<span class="err">落子请求失败。</span>'; })
+      .finally(function () { busy = false; render(); });
+  });
+
+  elResign.addEventListener('click', function () {
+    if (!state || state.phase !== 'playing') return;
+    if (!window.confirm('确定认输吗?这一局会判 AI 胜。')) return;
+    busy = true;
+    fetch('resign', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(apply)
+      .catch(function () { elFoot.innerHTML = '<span class="err">认输请求失败。</span>'; })
+      .finally(function () { busy = false; render(); });
+  });
+
+  window.addEventListener('resize', fit);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && !busy) fetchState();
+  });
+
+  fetchState().then(function () { fit(); });
+  startPolling();
+})();
+</script>
+</body>
+</html>

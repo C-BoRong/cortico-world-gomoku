@@ -1,0 +1,46 @@
+{
+  "name": "cortico-world-gomoku",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "让以 cortico 驱动的 ai 智能体陪你下五子棋",
+  "license": "MIT",
+  "author": "Brong",
+  "keywords": [
+    "cortico",
+    "cortico-world",
+    "gomoku",
+    "五子棋",
+    "world",
+    "agent"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.5.0",
+  "main": "./src/index.ts",
+  "cortico": {
+    "kind": "world",
+    "api": 4
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm typecheck && pnpm test"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "cortico": "0.1.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
