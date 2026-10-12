@@ -1,210 +1,108 @@
-import { describe, it, expect } from 'vitest';
-import {
-  createPosition,
-  place,
-  rejectReason,
-  renderBoard,
-  resign,
-  winningLine,
-  winnerOf,
-  opponentOf,
-} from '../src/game.ts';
-import { explainCoord, formatCoord, parseCoord } from '../src/coord.ts';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { GameStore, GameError } from '../src/game.ts';
 
-const size = 15;
-const win = 5;
-const fresh = () => createPosition(size, win, 'black');
+let dir: string;
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'gomoku-game-')); });
+afterEach(() => { if (!resolve(dir).startsWith(resolve(tmpdir()))) throw new Error('Invalid cleanup path'); rmSync(dir, { recursive: true, force: true }); });
+const defaults = { botColor: 'white' as const, forbiddenEnabled: true, maxHistoryGames: 2 };
+function store(file = join(dir, 'state.json')) { return new GameStore(file, () => defaults, () => '2026-10-12T12:00:00+08:00'); }
+function act(s: GameStore, action: string, args: Record<string, unknown> = {}, actor: 'human' | 'bot' = 'human') { return s.apply({ action, revision: s.snapshot().revision, ...args }, actor); }
 
-describe('落子与轮次', () => {
-  it('黑先下,落子后轮到白', () => {
-    const p = place(fresh(), 7, 7);
-    expect(p.turn).toBe('white');
-    expect(p.moves).toBe(1);
-    expect(p.lastMove).toEqual({ col: 7, row: 7 });
+ describe('game state and persistence', () => {
+  it('enforces identities, turns, coordinates and revisions without changing rejected state', () => {
+    const s = store(); act(s, 'start');
+    const before = s.snapshot();
+    expect(() => act(s, 'move', { x: 7, y: 7 }, 'bot')).toThrow('当前轮到');
+    expect(() => act(s, 'move', { x: 15, y: 0 })).toThrow('列坐标');
+    expect(s.snapshot()).toEqual(before);
+    act(s, 'move', { x: 7, y: 7 });
+    expect(() => s.apply({ action: 'move', x: 1, y: 1, revision: before.revision }, 'bot')).toThrow(GameError);
+    act(s, 'move', { x: 7, y: 8 }, 'bot');
+    expect(s.snapshot().game.moves.map(m => [m.color, m.actor])).toEqual([['black', 'human'], ['white', 'bot']]);
+    expect(() => act(s, 'color', { botColor: 'black' }, 'bot')).toThrow('开始落子后');
   });
-
-  it('落子不改动原来的局面', () => {
-    const before = fresh();
-    place(before, 7, 7);
-    expect(before.moves).toBe(0);
-    expect(before.turn).toBe('black');
+  it('distinguishes a help request from an actual assisted move', () => {
+    const s = store(); act(s, 'start'); act(s, 'assist');
+    expect(s.snapshot().game.moves).toHaveLength(0);
+    const change = act(s, 'assist', { x: 0, y: 0 }, 'bot');
+    expect(change.type).toBe('move');
+    expect(s.snapshot().game.moves[0]).toMatchObject({ color: 'black', actor: 'assist' });
+    expect(() => act(s, 'assist', { x: 1, y: 1 }, 'bot')).toThrow('当前轮到');
   });
-
-  it('占了的格子、越界的坐标、终局后的落子都被拒', () => {
-    const p = place(fresh(), 7, 7);
-    expect(rejectReason(p, 7, 7)).toBe('occupied');
-    expect(rejectReason(p, -1, 0)).toBe('out-of-bounds');
-    expect(rejectReason(p, size, 0)).toBe('out-of-bounds');
-    expect(rejectReason(p, 1.5, 2)).toBe('out-of-bounds');
-    expect(rejectReason(p, 0, 0)).toBeNull();
+  it('allows sides and rules to change only before the first move', () => {
+    const s = store(); act(s, 'start'); act(s, 'color', { botColor: 'black' }, 'bot');
+    act(s, 'rules', { forbiddenEnabled: false }, 'bot');
+    act(s, 'move', { x: 0, y: 0 }, 'bot');
+    expect(() => act(s, 'rules', { forbiddenEnabled: true }, 'bot')).toThrow('开始落子后');
+    expect(s.snapshot().game.forbiddenEnabled).toBe(false);
   });
-
-  it('非法落子在 place() 里抛错,而不是静默返回原局面', () => {
-    const p = place(fresh(), 7, 7);
-    expect(() => place(p, 7, 7)).toThrow(/occupied/);
+  it('declares victory, refuses later moves, and reopens the board after undo', () => {
+    const s = store(); act(s, 'start', { forbiddenEnabled: false });
+    for (let x = 0; x < 4; x++) { act(s, 'move', { x, y: 0 }); act(s, 'move', { x, y: 2 }, 'bot'); }
+    act(s, 'move', { x: 4, y: 0 });
+    expect(s.snapshot().game).toMatchObject({ status: 'won', winner: 'black' });
+    expect(s.snapshot().game.winningLine).toHaveLength(5);
+    expect(() => act(s, 'move', { x: 4, y: 2 }, 'bot')).toThrow('结束后');
+    act(s, 'undo', { count: 1 });
+    expect(s.snapshot().game).toMatchObject({ status: 'playing', winner: null, turn: 'black' });
+    expect(s.snapshot().game.board[0][4]).toBeNull();
   });
-});
-
-describe('胜负判定', () => {
-  it('横向五连获胜,并给出五连的坐标', () => {
-    let p = fresh();
-    // 黑: (0..4, 0);白: (0..3, 1)
-    for (let i = 0; i < 5; i += 1) {
-      p = place(p, i, 0);
-      if (i < 4) p = place(p, i, 1);
-    }
-    expect(p.phase).toBe('black-won');
-    expect(winnerOf(p.phase)).toBe('black');
-    expect(p.turn).toBeNull();
-    const line = winningLine(p);
-    expect(line).toHaveLength(5);
-    expect(line?.map((c) => c.col)).toEqual([0, 1, 2, 3, 4]);
+  it('undoes a full pair and preserves an audit of removed moves', () => {
+    const s = store(); act(s, 'start'); act(s, 'move', { x: 1, y: 1 }); act(s, 'move', { x: 2, y: 2 }, 'bot');
+    act(s, 'undo', { count: 2 });
+    expect(s.snapshot().game.moves).toEqual([]);
+    expect(s.snapshot().game.turn).toBe('black');
+    expect(s.snapshot().game.actions.at(-1)?.detail).toContain('B2');
+    expect(() => act(s, 'undo', { count: 1 })).toThrow('没有可以');
   });
-
-  it('竖向与两个斜向的五连都算赢', () => {
-    const cases: Array<[number, number]> = [
-      [0, 1],
-      [1, 1],
-      [1, -1],
-    ];
-    for (const [dc, dr] of cases) {
-      let p = fresh();
-      for (let i = 0; i < 5; i += 1) {
-        p = place(p, 7 + dc * i, 7 + dr * i);
-        if (i < 4) p = place(p, 0, 14 - i); // 白棋落在远处的角上,不干扰
-      }
-      expect(p.phase, `direction ${dc},${dr}`).toBe('black-won');
-    }
+  it('resignation awards the other side and clearing archives instead of deleting records', () => {
+    const s = store(); act(s, 'start'); act(s, 'resign', {}, 'bot');
+    expect(s.snapshot().game).toMatchObject({ status: 'resigned', winner: 'black' });
+    const id = s.snapshot().game.id; act(s, 'clear');
+    expect(s.snapshot().game.status).toBe('idle');
+    expect(s.exportGame(id!)).toMatchObject({ winner: 'black', status: 'resigned' });
   });
-
-  it('四子不算赢', () => {
-    let p = fresh();
-    for (let i = 0; i < 4; i += 1) {
-      p = place(p, i, 0);
-      p = place(p, i, 1);
-    }
-    expect(p.phase).toBe('playing');
+  it('retains the newest configured number of games and restores current board', () => {
+    const s = store(); act(s, 'start');
+    for (let i = 0; i < 3; i++) act(s, 'start');
+    act(s, 'move', { x: 14, y: 14 });
+    expect(s.snapshot().history).toHaveLength(2);
+    const restored = store(); restored.load(); expect(restored.snapshot()).toEqual(s.snapshot());
   });
-
-  it('五连中间被隔断不算赢', () => {
-    let p = fresh();
-    // 黑占 0,1,2 与 4,白插在 3
-    p = place(p, 0, 0); p = place(p, 0, 5);
-    p = place(p, 1, 0); p = place(p, 1, 5);
-    p = place(p, 2, 0); p = place(p, 2, 5);
-    p = place(p, 3, 5); // 白占掉断点
-    p = place(p, 4, 0);
-    expect(p.phase).toBe('playing');
+  it('rolls back an operation when persistence fails', () => {
+    mkdirSync(join(dir, 'target'));
+    const s = store(join(dir, 'target')); const before = s.snapshot();
+    expect(() => act(s, 'start')).toThrow();
+    expect(s.snapshot()).toEqual(before);
   });
-
-  it('认输判对手胜', () => {
-    const p = resign(fresh());
-    expect(p.phase).toBe('white-won');
-    expect(winnerOf(p.phase)).toBe('white');
+  it('reports corrupted records without overwriting the file', () => {
+    const s = store(); act(s, 'start');
+    const saved = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8'));
+    saved.game.board[0][0] = 'black'; const content = JSON.stringify(saved);
+    writeFileSync(join(dir, 'state.json'), content);
+    expect(() => store().load()).toThrow('存档格式');
+    expect(readFileSync(join(dir, 'state.json'), 'utf8')).toBe(content);
   });
-
-  it('终局后不能再认输', () => {
-    expect(() => resign(resign(fresh()))).toThrow(/cannot resign/);
+  it('declares a draw when all 225 legal intersections are filled without a five', () => {
+    const s = store(); act(s, 'start', { forbiddenEnabled: false });
+    const black: Array<{ x: number; y: number }> = [], white: Array<{ x: number; y: number }> = [];
+    for (let y = 0; y < 15; y++) for (let x = 0; x < 15; x++) ((x + 2 * y) % 4 < 2 ? black : white).push({ x, y });
+    expect(black).toHaveLength(113); expect(white).toHaveLength(112);
+    for (let i = 0; i < 112; i++) { act(s, 'move', black[i]); act(s, 'move', white[i], 'bot'); }
+    act(s, 'move', black[112]);
+    expect(s.snapshot().game).toMatchObject({ status: 'draw', winner: null });
+    expect(s.snapshot().game.moves).toHaveLength(225);
   });
-
-  it('棋盘下满且无五连是平局', () => {
-    // 5 路棋盘、连 5 子:棋盘恰好 25 格,填满时任何一行/列/对角都不可能凑齐 5 个同色而不触发胜利,
-    // 所以用一个已知无五连的填色,再逐格按合法轮次落子,验证最后一步落到 draw。
-    // 这里走真实路径:place() 逐手调用,只要求它中途不判胜、最后判平局。
-    const p = createPosition(5, 5, 'black');
-    const grid = [
-      'B B W W B',
-      'W W B B W',
-      'B B W W B',
-      'W W B B W',
-      'B B W W B',
-    ].map((row) => row.split(' ').map((c) => (c === 'B' ? 'black' : 'white')));
-    // 检查这个填色确实没有五连(否则下面会中途判胜)
-    const lineOf = (cells: (string | null)[], n: number) => {
-      if (cells.some((c) => c === null)) return false;
-      return cells.every((c) => c === cells[0]) && cells.length >= n;
-    };
-    for (let r = 0; r < 5; r += 1) expect(lineOf(grid[r]!, 5)).toBe(false);
-    for (let c = 0; c < 5; c += 1) expect(lineOf(grid.map((row) => row[c]!), 5)).toBe(false);
-
-    // 按黑白交替的落子顺序还原这个填色:黑棋先手,所以黑的位置有 13 格、白 12 格
-    const blacks: Array<[number, number]> = [];
-    const whites: Array<[number, number]> = [];
-    for (let r = 0; r < 5; r += 1) {
-      for (let c = 0; c < 5; c += 1) {
-        (grid[r]![c] === 'black' ? blacks : whites).push([c, r]);
-      }
-    }
-    expect(blacks).toHaveLength(13);
-    expect(whites).toHaveLength(12);
-
-    let cur = p;
-    for (let i = 0; i < 12; i += 1) {
-      cur = place(cur, blacks[i]![0], blacks[i]![1]);
-      cur = place(cur, whites[i]![0], whites[i]![1]);
-    }
-    cur = place(cur, blacks[12]![0], blacks[12]![1]); // 最后一手
-
-    expect(cur.moves).toBe(25);
-    expect(cur.phase).toBe('draw');
-    expect(cur.turn).toBeNull();
+  it('rejects a real double-three with a readable reason and leaves board and revision unchanged', () => {
+    const s = store(); act(s, 'start');
+    const black = [{ x: 6, y: 7 }, { x: 8, y: 7 }, { x: 7, y: 6 }, { x: 7, y: 8 }];
+    for (let i = 0; i < black.length; i++) { act(s, 'move', black[i]); act(s, 'move', { x: 2 * i, y: 0 }, 'bot'); }
+    const before = s.snapshot();
+    expect(() => act(s, 'move', { x: 7, y: 7 })).toThrow('双三禁手');
+    expect(s.snapshot()).toEqual(before);
   });
 });
 
-describe('坐标', () => {
-  it('字母风格写成 H8,数字风格写成 8,8', () => {
-    expect(formatCoord(7, 7, 'letters')).toBe('H8');
-    expect(formatCoord(7, 7, 'numeric')).toBe('8,8');
-    expect(formatCoord(0, 0, 'letters')).toBe('A1');
-    expect(formatCoord(14, 14, 'letters')).toBe('O15');
-  });
-
-  it('解析接受大小写、连字符与括号', () => {
-    expect(parseCoord('H8', size)).toEqual({ col: 7, row: 7 });
-    expect(parseCoord('h8', size)).toEqual({ col: 7, row: 7 });
-    expect(parseCoord('H-8', size)).toEqual({ col: 7, row: 7 });
-    expect(parseCoord('(8,8)', size)).toEqual({ col: 7, row: 7 });
-    expect(parseCoord('8 8', size)).toEqual({ col: 7, row: 7 });
-  });
-
-  it('越界与读不出的输入返回 null,不抛错', () => {
-    expect(parseCoord('Z99', size)).toBeNull();
-    expect(parseCoord('A0', size)).toBeNull();
-    expect(parseCoord('hello', size)).toBeNull();
-    expect(parseCoord('', size)).toBeNull();
-  });
-
-  it('解析出的坐标一定能格式化回同一格', () => {
-    for (const [col, row] of [[0, 0], [7, 7], [14, 14], [3, 11]] as const) {
-      expect(parseCoord(formatCoord(col, row, 'letters'), size)).toEqual({ col, row });
-      expect(parseCoord(formatCoord(col, row, 'numeric'), size)).toEqual({ col, row });
-    }
-  });
-
-  it('两种风格都给出解释文本', () => {
-    expect(explainCoord('letters', size)).toContain('H8');
-    expect(explainCoord('numeric', size)).toContain('1');
-  });
-});
-
-describe('棋盘渲染', () => {
-  it('渲染出行号列标与黑白子', () => {
-    let p = place(fresh(), 7, 7);      // 黑 H8
-    p = place(p, 0, 0);                 // 白 A1
-    const text = renderBoard(p, (c, r) => formatCoord(c, r, 'letters'));
-    const lines = text.split('\n');
-    expect(lines[0]).toContain('A');
-    expect(lines[0]).toContain('O');
-    // 行 1 有白子,行 8 有黑子
-    expect(lines[1]).toContain('O');
-    expect(lines[8]).toContain('X');
-    expect(lines).toHaveLength(size + 1);
-  });
-});
-
-describe('opponentOf', () => {
-  it('黑白互指', () => {
-    expect(opponentOf('black')).toBe('white');
-    expect(opponentOf('white')).toBe('black');
-  });
-});

@@ -6,5 +6,7 @@ export default defineConfig({
     env: { CORTICO_LANGUAGE: 'zh' },
     testTimeout: 20000,
     pool: 'forks',
+    maxWorkers: 2,
+    minWorkers: 1,
   },
 });

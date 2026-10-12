@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>五子棋 · Cortico</title>
+  <style>
+    :root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;color:#243c34;background:#eef0e9;font-synthesis:none;--green:#255b43;--muted:#6d7d71;--line:#d7dfd3;--surface:#fafbf6}
+    *{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.46}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #d69745;outline-offset:3px}
+    .shell{max-width:1380px;margin:0 auto;padding:36px 40px 30px}.eyebrow{font-size:11px;font-weight:700;letter-spacing:2.4px;color:var(--muted);text-transform:uppercase}.header{display:flex;align-items:center;justify-content:space-between;padding-bottom:25px;border-bottom:1px solid var(--line);gap:18px}.title{display:flex;align-items:center;gap:18px}.logo{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--green);color:white;font-size:25px;font-weight:500}.title h1{font-size:27px;font-weight:650;margin:3px 0 0;letter-spacing:3px}.connection{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}.connection i{width:7px;height:7px;background:#ba854c;border-radius:50%}.connection.connected i{background:#4d8d58}.layout{display:grid;grid-template-columns:minmax(440px,1fr) 320px;gap:36px;padding-top:28px}.board-column{min-width:0}.board-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 19px}.board-top h2{font-size:16px;font-weight:600;margin:0}.badge{padding:7px 12px;border:1px solid var(--line);border-radius:30px;font-size:11px;color:var(--muted);white-space:nowrap}.board-frame{border-radius:18px;padding:30px;background:#d9b985;box-shadow:inset 0 0 0 1px #be9a64,0 15px 45px #243c3410}.board-wrap{position:relative;padding:17px 0 0 17px}.board{display:grid;grid-template-columns:repeat(15,minmax(0,1fr));aspect-ratio:1;position:relative;isolation:isolate}.board::before{content:"";position:absolute;inset:calc(100% / 30);background:linear-gradient(to right,#765a3d 1px,transparent 1px),linear-gradient(to bottom,#765a3d 1px,transparent 1px);background-size:calc(100% / 14) calc(100% / 14);border-right:1px solid #765a3d;border-bottom:1px solid #765a3d;z-index:-1;pointer-events:none}.cell{padding:0;border:0;background:transparent;display:grid;place-items:center;position:relative;aspect-ratio:1;touch-action:manipulation}.cell::before{content:"";width:13%;aspect-ratio:1;border-radius:50%;position:absolute;background:transparent}.cell.star::before{background:#765a3d}.cell:focus-visible{outline:2px solid var(--green);outline-offset:-1px;border-radius:5px}.stone{width:83%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;font-size:clamp(9px,1vw,13px);font-weight:650;position:relative;box-shadow:0 2px 3px #38261335}.stone.black{background:radial-gradient(circle at 32% 25%,#4c4d4d,#191c1c 70%);color:#fff}.stone.white{background:radial-gradient(circle at 32% 25%,#fff,#eeece5 75%);color:#364039;border:1px solid #9f937762}.stone.last::after{content:"";width:25%;aspect-ratio:1;border:2px solid #e1a348;border-radius:50%;position:absolute}.numbers .stone.last::after{display:none}.cell:hover:not([aria-disabled="true"]):not(.occupied)::after{content:"";position:absolute;width:72%;aspect-ratio:1;border:2px solid #255b4366;border-radius:50%;background:#fff3}.axis{position:absolute;display:grid;color:#745a3a;font-size:10px;font-weight:500;pointer-events:none}.axis-x{left:17px;top:0;right:0;grid-template-columns:repeat(15,1fr);text-align:center}.axis-y{left:0;top:17px;bottom:0;grid-template-rows:repeat(15,1fr);width:13px;align-items:center;text-align:right}.board-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:18px;gap:16px;font-size:12px;color:var(--muted)}.number-toggle{display:flex;align-items:center;gap:7px;white-space:nowrap}.number-toggle input{accent-color:var(--green)}.turn-card{display:flex;align-items:center;gap:15px;padding:20px;background:var(--surface);border:1px solid var(--line);border-radius:14px}.turn-stone{width:31px;height:31px;flex-shrink:0;border-radius:50%;background:#23342d;box-shadow:inset 3px 3px 5px #ffffff20,0 2px 4px #243c3425}.turn-stone.white{background:#f7f6ef;border:1px solid #c9cfc4}.turn-card p{margin:0}.turn-main{font-size:16px;font-weight:650}.turn-sub{font-size:11px;color:var(--muted);margin-top:5px!important}.section{margin-top:23px}.section-title{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1.6px;margin:0 0 12px}.setup{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:18px}.field{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px}.field+.field{margin-top:16px}.field select{border:1px solid var(--line);border-radius:7px;padding:7px 10px;background:white;color:#243c34;min-width:116px}.field input{accent-color:var(--green);width:16px;height:16px}.rule-note{font-size:11px;line-height:1.8;color:var(--muted);margin:15px 0 0}.button{border:1px solid var(--line);background:var(--surface);border-radius:8px;color:#314c3d;padding:11px 12px;font-size:12px;font-weight:550;transition:background .15s}.button:hover:enabled{background:#e5ebdf}.primary{background:var(--green);border-color:var(--green);color:#fff;width:100%;margin-top:16px;padding:13px}.primary:hover:enabled{background:#1b4733}.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.help{grid-column:1/-1;border-color:#bdcdbb}.danger{color:#8e5b42}.history-head{display:flex;align-items:center;justify-content:space-between}.text-button{border:0;background:transparent;color:var(--green);font-size:11px;padding:4px 0}.history-box{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}.history-scroll{height:190px;overflow:auto;scrollbar-width:thin}.history-empty{font-size:12px;color:var(--muted);text-align:center;padding:65px 12px}.move-row{display:grid;grid-template-columns:27px 1fr 52px;gap:10px;padding:10px 14px;font-size:12px;border-bottom:1px solid #e8ece2}.move-row:last-child{border-bottom:0}.move-no{color:#829081;font-size:11px}.move-side{display:flex;align-items:center;gap:8px}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#23342d}.dot.white{background:#fff;border:1px solid #aab3a4}.coordinate{font-variant-numeric:tabular-nums;text-align:right;font-weight:600;color:#4e6856}.replay{display:flex;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}.replay input{width:100%;accent-color:var(--green)}.replay span{white-space:nowrap}.notice{font-size:12px;line-height:1.7;min-height:21px;color:var(--muted);margin-top:14px}.notice.error{color:#9f4d3e}.footer{display:flex;justify-content:space-between;gap:15px;border-top:1px solid var(--line);margin-top:30px;padding-top:18px;font-size:10px;line-height:1.8;color:#879082}.footer strong{font-weight:600;color:#66796a}
+    @media(max-width:980px){.shell{padding:24px}.layout{grid-template-columns:minmax(360px,1fr) 280px;gap:24px}.board-frame{padding:20px}.title h1{font-size:24px}}@media(max-width:760px){.shell{padding:20px 15px}.layout{grid-template-columns:1fr;gap:25px;padding-top:22px}.header{padding-bottom:18px}.logo{width:40px;height:40px;border-radius:11px;font-size:22px}.title{gap:12px}.title h1{font-size:22px}.eyebrow{font-size:9px;letter-spacing:1.7px}.connection{font-size:10px}.board-frame{padding:18px 14px 15px 10px;border-radius:12px}.sidebar{display:grid;grid-template-columns:1fr 1fr;gap:20px}.turn-card{grid-column:1/-1;padding:16px}.section{margin-top:0}.history-section{grid-column:1/-1}.notice{grid-column:1/-1;margin:0}.stone{font-size:11px}.board-bottom{font-size:11px}.footer{margin-top:24px}.board-top{margin-bottom:13px}.history-scroll{height:155px}}@media(max-width:420px){.sidebar{grid-template-columns:1fr}.turn-card,.history-section,.notice{grid-column:auto}.board-frame{padding:15px 10px 12px 7px}.stone{font-size:9px}.connection{max-width:80px}.footer{flex-direction:column;gap:4px}}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div class="title"><div class="logo" aria-hidden="true">五</div><div><div class="eyebrow">Cortico · Gomoku World</div><h1>五子棋</h1></div></div>
+      <div class="connection" id="connection" role="status"><i aria-hidden="true"></i><span>正在连接</span></div>
+    </header>
+    <div class="layout">
+      <section class="board-column" aria-label="五子棋棋盘">
+        <div class="board-top"><h2 id="game-title">准备开始</h2><span class="badge" id="rule-badge">15 × 15</span></div>
+        <div class="board-frame"><div class="board-wrap"><div class="axis axis-x" id="axis-x" aria-hidden="true"></div><div class="axis axis-y" id="axis-y" aria-hidden="true"></div><div class="board" id="board" role="group" aria-label="15×15 棋盘，左上 A1。方向键移动，回车落子。"></div></div></div>
+        <div class="board-bottom"><span id="last-move">黑方先行 · 左上角 A1</span><label class="number-toggle"><input type="checkbox" id="numbers">显示手数</label></div>
+      </section>
+      <aside class="sidebar" aria-label="对局操作">
+        <div class="turn-card" role="status" aria-live="polite"><div class="turn-stone" id="turn-stone" aria-hidden="true"></div><div><p class="turn-main" id="turn-main">等待开局</p><p class="turn-sub" id="turn-sub">选择颜色，开始一局</p></div></div>
+        <section class="section"><h2 class="section-title">对局设置</h2><div class="setup"><label class="field">我的颜色<select id="human-color"><option value="black">黑方 · 先行</option><option value="white">白方 · 后行</option></select></label><label class="field">启用黑方禁手<input type="checkbox" id="renju"></label><p class="rule-note">自由规则：双方五枚或更多连珠获胜。启用禁手：黑方限准确五连，限制长连、双四、双三；白方五枚或更多连珠获胜。</p><button class="button primary" id="start">开始游戏</button></div></section>
+        <section class="section"><h2 class="section-title">棋局操作</h2><div class="actions"><button class="button" id="undo-one">悔棋 1 手</button><button class="button" id="undo-two">悔棋 2 手</button><button class="button help" id="help">请 bot 帮我下</button><button class="button danger" id="resign">我认输</button><button class="button danger" id="clear">清空棋盘</button></div></section>
+        <section class="section history-section"><div class="history-head"><h2 class="section-title">对局记录 <span id="move-count">0</span></h2><div><button class="text-button" id="export">JSON ↓</button> · <button class="text-button" id="export-text">TXT ↓</button></div></div><label class="field" style="margin-bottom:10px"><span class="eyebrow" style="font-size:10px;letter-spacing:0">棋局</span><select id="game-select" aria-label="选择当前棋局或历史对局" style="width:100%"><option value="current">当前棋局</option></select></label><div class="history-box"><div class="history-scroll" id="history"><div class="history-empty">落子后，记录会出现在这里</div></div><div class="replay"><span id="replay-label">实时</span><input type="range" id="replay" value="0" min="0" max="0" aria-label="复盘手数"></div></div></section>
+        <div class="notice" id="notice" role="status" aria-live="polite"></div>
+      </aside>
+    </div>
+    <footer class="footer"><span><strong>黑方先行</strong> · 方向键选择交叉点，回车落子</span><span id="footer-status">棋盘状态由 Gomoku World 同步</span></footer>
+  </main>
+  <script>
+  (function () {
+    "use strict";
+    var letters = "ABCDEFGHIJKLMNO";
+    var el = function (id) { return document.getElementById(id); };
+    var state = null, view = null, busy = false, connected = false, replayStep = null, focused = 112, selectedGameId = "current";
+    var cells = [], stream = null, pollTimer = null;
+    var opposite = function (color) { return color === "black" ? "white" : "black"; };
+    var colorLabel = function (color) { return color === "black" ? "黑方" : "白方"; };
+    var coordinate = function (move) { return letters[move.x] + (move.y + 1); };
+    function message(text, error) { el("notice").textContent = text; el("notice").classList.toggle("error", Boolean(error)); }
+    function connection(value) {
+      connected = value;
+      el("connection").classList.toggle("connected", value);
+      el("connection").querySelector("span").textContent = value ? "已连接" : "连接中断";
+      if (view) {
+        el("footer-status").textContent = !value ? "连接中断，正在重新连接" : "共 " + view.moves.length + " 手 · " + (selectedGameId === "current" ? "当前棋局实时同步" : "历史记录只读");
+        renderControls();
+      }
+    }
+    function normalize(raw) {
+      var game = selectedGameId === "current" ? raw.game : raw.history.find(function (item) { return item.id === selectedGameId; });
+      return {
+        id: game.id, revision: raw.revision, status: game.status, botColor: game.botColor,
+        renju: game.forbiddenEnabled, turn: game.turn, moves: game.moves,
+        result: ["won", "draw", "resigned"].includes(game.status) ? { winner: game.winner, reason: game.status } : null,
+        winningLine: game.winningLine
+      };
+    }
+    function apply(raw) {
+      if (selectedGameId !== "current" && !raw.history.some(function (item) { return item.id === selectedGameId; })) selectedGameId = "current";
+      var next = normalize(raw);
+      if (view && Number.isInteger(next.revision) && next.revision < view.revision) return;
+      var previous = view;
+      state = raw; view = next;
+      if (!previous || previous.id !== next.id || next.moves.length < previous.moves.length) replayStep = null;
+      if (!previous || previous.id !== next.id || previous.botColor !== next.botColor || previous.renju !== next.renju) {
+        el("human-color").value = opposite(next.botColor || "white");
+        el("renju").checked = Boolean(next.renju);
+      }
+      render();
+    }
+    function playing() { return view && view.status === "playing"; }
+    function live() { return replayStep === null || replayStep === view.moves.length; }
+    function humanTurn() { return playing() && view.turn === opposite(view.botColor); }
+    function renderControls() {
+      var unavailable = busy || !connected || !view || selectedGameId !== "current";
+      el("start").disabled = unavailable;
+      el("start").textContent = view && view.status !== "idle" ? "开始新一局" : "开始游戏";
+      el("undo-one").disabled = unavailable || !view.moves.length;
+      el("undo-two").disabled = unavailable || view.moves.length < 2;
+      el("resign").disabled = unavailable || !playing();
+      el("clear").disabled = unavailable || (view.status === "idle" && !view.moves.length);
+      el("help").disabled = unavailable || !humanTurn() || !live();
+      el("export").disabled = !view || !view.moves.length;
+      el("export-text").disabled = !view || !view.moves.length;
+      el("human-color").disabled = selectedGameId !== "current";
+      el("renju").disabled = selectedGameId !== "current";
+      el("replay").disabled = !view || !view.moves.length;
+      cells.forEach(function (cell) {
+        cell.disabled = unavailable || !humanTurn() || !live() || cell.classList.contains("occupied");
+        // Keep occupied intersections reachable while reviewing the board.
+        cell.setAttribute("aria-disabled", String(cell.disabled));
+        cell.disabled = false;
+      });
+    }
+    function render() {
+      var shown = replayStep === null ? view.moves.length : Math.min(replayStep, view.moves.length);
+      var boardMoves = new Map();
+      view.moves.slice(0, shown).forEach(function (move, index) { boardMoves.set(move.y * 15 + move.x, { move: move, number: index + 1 }); });
+      var numbers = el("numbers").checked;
+      el("board").classList.toggle("numbers", numbers);
+      cells.forEach(function (cell, index) {
+        var item = boardMoves.get(index), x = index % 15, y = Math.floor(index / 15);
+        cell.textContent = "";
+        cell.classList.toggle("occupied", Boolean(item));
+        cell.setAttribute("aria-label", letters[x] + (y + 1) + (item ? "，" + colorLabel(item.move.color) + "第 " + item.number + " 手" : "，空位"));
+        if (item) {
+          var stone = document.createElement("span");
+          var winning = shown === view.moves.length && view.winningLine.some(function (point) { return point.x === item.move.x && point.y === item.move.y; });
+          stone.className = "stone " + item.move.color + (item.number === shown ? " last" : "");
+          if (winning) stone.style.outline = "2px solid #c88425";
+          stone.setAttribute("aria-hidden", "true");
+          if (numbers) stone.textContent = item.number;
+          cell.appendChild(stone);
+        }
+      });
+      el("move-count").textContent = view.moves.length;
+      el("rule-badge").textContent = view.renju ? "15 × 15 · 黑方禁手" : "15 × 15 · 自由规则";
+      el("replay").max = view.moves.length;
+      el("replay").value = shown;
+      el("replay-label").textContent = shown === view.moves.length ? (selectedGameId === "current" ? "实时" : "完整棋谱") : "第 " + shown + " 手";
+      var last = view.moves[shown - 1];
+      el("last-move").textContent = last ? "第 " + shown + " 手 · " + colorLabel(last.color) + " " + coordinate(last) : "黑方先行 · 左上角 A1";
+      var result = view.result, winner = result && (result.winner || result.color);
+      var reason = result && result.reason;
+      var reasons = { won: "连成五子", resigned: "对方认输", draw: "棋盘已满" };
+      var headline = playing() ? (humanTurn() ? "轮到你落子" : "轮到 bot 落子") : result ? (winner ? colorLabel(winner) + "获胜" : "平局") : "等待开局";
+      el("turn-main").textContent = selectedGameId !== "current" ? "历史棋局 · 第 " + shown + " 手" : !live() ? "正在复盘 · 第 " + shown + " 手" : headline;
+      el("turn-sub").textContent = selectedGameId !== "current" ? (result ? headline + " · " + reasons[reason] : "已存档的对局") : !live() ? "滑到末尾可回到当前棋局" : result ? reasons[reason] : playing() ? "你执" + colorLabel(opposite(view.botColor)) + " · bot 执" + colorLabel(view.botColor) : "选择颜色，开始一局";
+      el("turn-stone").classList.toggle("white", (winner || view.turn) === "white");
+      el("game-title").textContent = selectedGameId !== "current" ? "历史复盘" : !live() ? "复盘" : playing() ? "对局中" : result ? "本局结束" : "准备开始";
+      el("footer-status").textContent = !connected ? "连接中断，正在重新连接" : "共 " + view.moves.length + " 手 · " + (selectedGameId === "current" ? "当前棋局实时同步" : "历史记录只读");
+      var gameSelect = el("game-select"); gameSelect.textContent = "";
+      var currentOption = document.createElement("option"); currentOption.value = "current"; currentOption.textContent = "当前棋局"; gameSelect.appendChild(currentOption);
+      state.history.forEach(function (game, index) {
+        var option = document.createElement("option"); option.value = game.id;
+        var date = game.startedAt ? new Date(game.startedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "历史 " + (index + 1);
+        option.textContent = date + " · " + game.moves.length + " 手" + (game.winner ? " · " + colorLabel(game.winner) + "胜" : game.status === "draw" ? " · 平局" : "");
+        gameSelect.appendChild(option);
+      });
+      gameSelect.value = selectedGameId;
+      var history = el("history"), nearBottom = history.scrollHeight - history.scrollTop - history.clientHeight < 35;
+      history.textContent = "";
+      if (!view.moves.length) {
+        var empty = document.createElement("div"); empty.className = "history-empty"; empty.textContent = "落子后，记录会出现在这里"; history.appendChild(empty);
+      }
+      view.moves.forEach(function (move, index) {
+        var row = document.createElement("div"); row.className = "move-row"; row.title = move.at;
+        var no = document.createElement("span"); no.className = "move-no"; no.textContent = String(index + 1).padStart(2, "0");
+        var side = document.createElement("span"); side.className = "move-side";
+        var dot = document.createElement("i"); dot.className = "dot " + move.color; dot.setAttribute("aria-hidden", "true"); side.appendChild(dot); side.appendChild(document.createTextNode(colorLabel(move.color) + " · " + (move.actor === "assist" ? "bot 代下" : move.actor === "bot" ? "bot" : "你")));
+        var at = document.createElement("span"); at.className = "coordinate"; at.textContent = coordinate(move);
+        row.append(no, side, at); history.appendChild(row);
+      });
+      if (nearBottom) history.scrollTop = history.scrollHeight;
+      renderControls();
+    }
+    async function load() {
+      try {
+        var response = await fetch("/api/state", { cache: "no-store" });
+        if (!response.ok) throw new Error("读取棋局失败（" + response.status + "）");
+        apply(await response.json());
+        connection(true);
+      } catch (error) { connection(false); message(error.message || "无法连接棋盘", true); }
+    }
+    async function action(kind, extra) {
+      if (busy || !connected || !view) return;
+      busy = true; renderControls();
+      try {
+        var headers = { "Content-Type": "application/json" };
+        var response = await fetch("/api/action", { method: "POST", headers: headers, body: JSON.stringify(Object.assign({ action: kind, revision: view.revision }, extra || {})) });
+        var result = await response.json();
+        if (!response.ok || result.ok === false) throw new Error(result.error || result.message || "操作失败（" + response.status + "）");
+        if (result.state || result.game || result.status) apply(result.state || result); else await load();
+        message(kind === "assist" ? "已请求 bot 帮你落一手" : "");
+      } catch (error) { message(error.message || "操作失败", true); await load(); }
+      finally { busy = false; renderControls(); }
+    }
+    function place(index) {
+      if (!view || busy || !connected) return;
+      if (selectedGameId !== "current") { message("历史棋局只可复盘，请先切回当前棋局"); return; }
+      if (!live()) { message("先将复盘滑到末尾，再落子"); return; }
+      if (!playing()) { message("请先开始游戏"); return; }
+      if (!humanTurn()) { message("现在轮到 bot 落子"); return; }
+      if (cells[index].classList.contains("occupied")) { message("这个交叉点已有棋子"); return; }
+      action("move", { x: index % 15, y: Math.floor(index / 15) });
+    }
+    function focusCell(index) {
+      cells[focused].tabIndex = -1; focused = index; cells[focused].tabIndex = 0; cells[focused].focus();
+    }
+    for (var axis = 0; axis < 15; axis++) {
+      var letter = document.createElement("span"); letter.textContent = letters[axis]; el("axis-x").appendChild(letter);
+      var number = document.createElement("span"); number.textContent = axis + 1; el("axis-y").appendChild(number);
+    }
+    for (var index = 0; index < 225; index++) {
+      (function (i) {
+        var cell = document.createElement("button"); cell.type = "button"; cell.className = "cell"; cell.tabIndex = i === focused ? 0 : -1;
+        var x = i % 15, y = Math.floor(i / 15);
+        if ((x === 3 || x === 11) && (y === 3 || y === 11) || x === 7 && y === 7) cell.classList.add("star");
+        cell.setAttribute("aria-label", letters[x] + (y + 1) + "，空位");
+        cell.addEventListener("click", function () { focusCell(i); place(i); });
+        cell.addEventListener("keydown", function (event) {
+          var next = i;
+          if (event.key === "ArrowLeft") next = y * 15 + Math.max(0, x - 1);
+          else if (event.key === "ArrowRight") next = y * 15 + Math.min(14, x + 1);
+          else if (event.key === "ArrowUp") next = Math.max(0, y - 1) * 15 + x;
+          else if (event.key === "ArrowDown") next = Math.min(14, y + 1) * 15 + x;
+          else if (event.key === "Home") next = y * 15;
+          else if (event.key === "End") next = y * 15 + 14;
+          else return;
+          event.preventDefault(); focusCell(next);
+        });
+        cells.push(cell); el("board").appendChild(cell);
+      })(index);
+    }
+    el("numbers").addEventListener("change", function () { if (view) render(); });
+    el("replay").addEventListener("input", function () { replayStep = Number(el("replay").value); if (replayStep === view.moves.length) replayStep = null; render(); });
+    el("game-select").addEventListener("change", function () { selectedGameId = el("game-select").value; replayStep = null; view = normalize(state); el("human-color").value = opposite(view.botColor); el("renju").checked = view.renju; render(); message(""); });
+    el("start").addEventListener("click", function () {
+      if (playing() && !confirm("开始新一局？当前棋局将结束并保存到历史。")) return;
+      action("start", { botColor: opposite(el("human-color").value), forbiddenEnabled: el("renju").checked });
+    });
+    el("undo-one").addEventListener("click", function () { action("undo", { count: 1 }); });
+    el("undo-two").addEventListener("click", function () { action("undo", { count: 2 }); });
+    el("help").addEventListener("click", function () { action("assist"); });
+    el("resign").addEventListener("click", function () { if (confirm("确认认输并结束本局？")) action("resign"); });
+    el("clear").addEventListener("click", function () { if (confirm("清空棋盘？当前棋局将保存到历史。")) action("clear"); });
+    function download(format) {
+      if (!state) return;
+      var link = document.createElement("a");
+      link.href = "/api/export?game=" + encodeURIComponent(selectedGameId) + "&format=" + format;
+      link.click();
+    }
+    el("export").addEventListener("click", function () { download("json"); });
+    el("export-text").addEventListener("click", function () { download("txt"); });
+    function subscribe() {
+      stream = new EventSource("/api/events");
+      stream.onopen = function () { connection(true); load(); };
+      stream.onmessage = function (event) {
+        try { apply(JSON.parse(event.data)); connection(true); } catch (error) { message("棋局同步失败，请刷新页面", true); }
+      };
+      stream.onerror = function () { connection(false); };
+    }
+    renderControls(); load();
+    if (typeof EventSource !== "undefined") subscribe();
+    pollTimer = setInterval(function () { if (!stream || stream.readyState !== 1) load(); }, 3000);
+    window.addEventListener("pagehide", function () { if (stream) stream.close(); clearInterval(pollTimer); });
+  })();
+  </script>
+</body>
+</html>

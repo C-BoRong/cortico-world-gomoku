@@ -1,6 +1,2 @@
-/** 包入口:默认导出 `WorldDefinition`,加载器按 `cortico.kind === 'world'` 认它。 */
-import { GOMOKU } from './definition.ts';
-
-export default GOMOKU;
-export { GOMOKU };
+export { GOMOKU as default, GOMOKU } from './definition.ts';
 export type { GomokuConfigSection } from './config.ts';
